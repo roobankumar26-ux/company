@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BEST MILLS — RRD Packing calc</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: url('Best Mills Wallpaper final.jpg') no-repeat center center fixed;
+      background-size: cover;
+    }
+
+    .overlay {
+      background: rgba(255, 255, 255, 0.88);
+      min-height: 100vh;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .container {
+      max-width: 700px;
+      background: white;
+      border-radius: 12px;
+      padding: 25px 25px 30px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+
+    h1, h2 {
+      margin-bottom: 10px;
+      color: #1e3a8a;
+      text-align: center;
+    }
+
+    h1 span {
+      color: #0284c7;
+    }
+
+    input {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .btn {
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-blue {
+      background: #0284c7;
+      color: white;
+    }
+
+    .btn-red {
+      background: #dc2626;
+      color: white;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 6px;
+      text-align: left;
+    }
+
+    tr:nth-child(even) {
+      background: #f9fafb;
+    }
+
+    .small {
+      font-size: 0.9em;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <div class="container">
+      <h1><strong>BEST <span>MILLS</span></strong></h1>
+      <h2>Packing Box calc</h2>
+      <p class="small" style="text-align:center;">Scan boxes — duplicates not allowed, PCS auto-calculated.</p>
+
+      <div style="margin-top:10px;">
+        <label><strong>PCS per box:</strong></label>
+        <input type="number" id="pcsPerBox" min="1" value="5">
+      </div>
+
+      <div style="margin-top:15px;">
+        <label><strong>Scan Box Barcode:</strong></label>
+        <input id="barcodeInput" placeholder="Scan box barcode..." autofocus>
+      </div>
+
+      <div style="margin-top:15px;">
+        <button class="btn btn-blue" id="exportExcel">Export Excel</button>
+        <button class="btn btn-red" id="clearAll">Clear All</button>
+      </div>
+
+      <div style="margin-top:15px;">
+        <h2>Totals</h2>
+        <div>Total Boxes: <strong id="totalBoxes">0</strong></div>
+        <div>Total PCS: <strong id="totalPcs">0</strong></div>
+      </div>
+
+      <div style="margin-top:15px;">
+        <h2>Scanned Boxes</h2>
+        <div id="tableArea" class="small">No boxes scanned yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let boxes = JSON.parse(localStorage.getItem("boxes") || "[]");
+    const pcsInput = document.getElementById("pcsPerBox");
+    const input = document.getElementById("barcodeInput");
+    const tableArea = document.getElementById("tableArea");
+
+    function save() {
+      localStorage.setItem("boxes", JSON.stringify(boxes));
+      render();
+    }
+
+    function render() {
+      const totalBoxes = boxes.length;
+      const totalPcs = boxes.reduce((sum, b) => sum + b.pcs, 0);
+      document.getElementById("totalBoxes").textContent = totalBoxes;
+      document.getElementById("totalPcs").textContent = totalPcs;
+
+      if (boxes.length === 0) {
+        tableArea.textContent = "No boxes scanned yet.";
+        return;
+      }
+
+      const rows = boxes.map(b => `
+        <tr>
+          <td>${b.barcode}</td>
+          <td>${b.pcs}</td>
+          <td>${formatDate(b.timestamp)}</td>
+        </tr>
+      `).join("");
+
+      tableArea.innerHTML = `
+        <table>
+          <tr><th>Box Barcode</th><th>PCS</th><th>Timestamp</th></tr>
+          ${rows}
+          <tr><td><strong>TOTAL</strong></td><td><strong>${totalPcs}</strong></td><td></td></tr>
+        </table>
+      `;
+    }
+
+    function formatDate(iso) {
+      const d = new Date(iso);
+      const pad = n => n.toString().padStart(2, "0");
+      return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}  Time ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    input.addEventListener("change", () => {
+      const barcode = input.value.trim();
+      if (!barcode) return;
+      if (boxes.some(b => b.barcode === barcode)) {
+        alert("Duplicate barcode!");
+        input.value = "";
+        return;
+      }
+
+      const pcs = parseInt(pcsInput.value, 10);
+      boxes.unshift({ barcode, pcs, timestamp: new Date().toISOString() });
+      input.value = "";
+      save();
+    });
+
+    document.getElementById("clearAll").onclick = () => {
+      if (confirm("Clear all data?")) {
+        boxes = [];
+        save();
+      }
+    };
+
+    document.getElementById("exportExcel").onclick = () => {
+      let totalPcs = boxes.reduce((sum, b) => sum + b.pcs, 0);
+      let html = `
+        <table border="1" style="border-collapse:collapse;text-align:left;">
+          <tr><th>Box Barcode</th><th>PCS</th><th>Timestamp</th></tr>
+      `;
+
+      boxes.forEach(b => {
+        html += `<tr>
+          <td>${b.barcode}</td>
+          <td>${b.pcs}</td>
+          <td>${formatDate(b.timestamp)}</td>
+        </tr>`;
+      });
+
+      html += `<tr><td><strong>TOTAL</strong></td><td><strong>${totalPcs}</strong></td><td></td></tr></table>`;
+
+      const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `box_scan_${new Date().toISOString()}.xls`;
+      a.click();
+    };
+
+    render();
+  </script>
+</body>
+</html>
